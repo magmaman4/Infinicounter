@@ -23,11 +23,3 @@ while running:
 
 print()
 print("... How'd you do that?")
-
-echo "# Infinicounter" >> README.md
-git init
-git add README.md
-git commit -m "first commit"
-git branch -M main
-git remote add origin https://github.com/magmaman4/Infinicounter.git
-git push -u origin main
