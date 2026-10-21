@@ -41,6 +41,9 @@ class Decision:
     comparator: str
     spikes: tuple  # readout spike counts for wire i and wire j
     swapped: bool
+    flipped: bool = False  # True if wire i was shown to the right hemisphere
+    items: tuple = ()  # input indices of the two items compared
+    rates: tuple = ()  # their stimulus rates, Hz
 
 
 @dataclass
@@ -106,7 +109,13 @@ class FlyBrainSorter:
             return np.full(len(x), (lo + hi) / 2)
         return lo + (x - x.min()) / span * (hi - lo)
 
-    def sort(self, values) -> SortResult:
+    def sort(self, values, observer=None) -> SortResult:
+        """Sort ``values`` ascending.
+
+        ``observer``, if given, is called after every brain simulation as
+        ``observer(round, decisions, spikes, rates)``, where ``spikes`` records
+        every neuron in the brain and ``decisions`` are that round's entries.
+        """
         values = list(values)
         n = len(values)
         result = SortResult(values=values[:], order=list(range(n)))
@@ -122,7 +131,11 @@ class FlyBrainSorter:
                 a, b = rate[wires[i]], rate[wires[j]]
                 drive.update(c.drive(b, a) if flip else c.drive(a, b))
                 plan.append((i, j, c, flip))
-            record = [x for _, _, c, _ in plan for x in (c.left_readout, c.right_readout)]
+            if observer is None:
+                record = [x for _, _, c, _ in plan for x in (c.left_readout, c.right_readout)]
+            else:
+                record = range(self.brain.n)
+            wires_before = wires[:]
             spikes = self.brain.simulate(
                 drive, self.duration, record=record, seed=self.seed + 7919 * r, mode=self.mode
             )
@@ -137,7 +150,12 @@ class FlyBrainSorter:
                     swap = spikes.first(ro_i) < spikes.first(ro_j)
                 if swap:
                     wires[i], wires[j] = wires[j], wires[i]
-                result.decisions.append(Decision(r, (i, j), c.sensory_type, (ni, nj), swap))
+                result.decisions.append(
+                    Decision(r, (i, j), c.sensory_type, (ni, nj), swap, flip,
+                             (wires_before[i], wires_before[j]), (rate[wires_before[i]], rate[wires_before[j]]))
+                )
+            if observer is not None:
+                observer(r, result.decisions[-len(plan):], spikes, rate)
         result.order = wires
         result.values = [values[k] for k in wires]
         return result

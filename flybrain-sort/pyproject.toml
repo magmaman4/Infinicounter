@@ -16,6 +16,10 @@ test = ["pytest"]
 
 [project.scripts]
 flybrain-sort = "flybrain_sort.__main__:main"
+flybrain-sort-gui = "flybrain_sort.gui:main"
 
 [tool.setuptools]
 packages = ["flybrain_sort"]
+
+[tool.setuptools.package-data]
+flybrain_sort = ["viewer.html"]

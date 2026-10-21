@@ -76,10 +76,12 @@ class Connectome:
         ann = pd.read_csv(
             paths["Supplemental_file1_neuron_annotations.tsv"],
             sep="\t",
-            usecols=["root_id", "super_class", "cell_class", "cell_type", "side"],
+            usecols=["root_id", "super_class", "cell_class", "cell_type", "side", "pos_x", "pos_y", "pos_z"],
             dtype=str,
         )
         ann["root_id"] = ann["root_id"].astype(np.int64)
+        for axis in ("pos_x", "pos_y", "pos_z"):  # FlyWire voxels (4 x 4 x 40 nm)
+            ann[axis] = pd.to_numeric(ann[axis], errors="coerce")
         neurons = pd.DataFrame({"root_id": comp.index.to_numpy(np.int64)})
         neurons = neurons.merge(ann.drop_duplicates("root_id"), on="root_id", how="left")
         return cls(w, neurons)

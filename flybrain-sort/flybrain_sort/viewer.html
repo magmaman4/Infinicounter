@@ -1,0 +1,758 @@
+<title>Fly Brain Sort</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a dark specimen stage. Brain and fly side by side, the sorting network
+   as a wide strip under them, the decision log last. One deliberate dark look. */
+:root {
+  --ink: #0c0e16;        /* stage background */
+  --panel: #141828;      /* panel surface */
+  --line: #262c44;       /* hairlines, faint gates */
+  --text: #ece6d6;       /* warm paper white */
+  --muted: #8f95ab;
+  --amber: #ffb547;      /* spikes, current gate, accent */
+  --left: #6fd3ff;       /* fly's left hemisphere */
+  --right: #ff86b0;      /* fly's right hemisphere */
+  --good: #8be3a4;
+  --bad: #ff8f6b;
+  --eye: #b3261e;
+  --eye-deep: #6d1410;
+  --chitin: #6b4a2b;
+  --chitin-deep: #3c2816;
+  --wing: #cfe3ff;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(30px, 5vw, 48px); font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+h1 .buzz { color: var(--amber); display: inline-block; }
+h2 { font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.brand { display: grid; gap: 8px; min-width: 0; max-width: 62ch; }
+.sub { margin: 0; color: var(--muted); }
+.sub strong { color: var(--text); font-weight: 700; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, .file {
+  font: 600 14px var(--body);
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+button:hover, select:hover, .file:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible, .file:focus-within { outline: 2px solid var(--amber); outline-offset: 2px; }
+button.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); min-width: 96px; }
+.file input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.file { position: relative; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; align-content: start; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.panel-head .mono { font-size: 12px; color: var(--muted); }
+
+#brain { width: 100%; aspect-ratio: 2 / 1.05; max-width: 100%; display: block; border-radius: 8px; background: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot.heat { background: radial-gradient(circle, #fff6c9, var(--amber) 50%, #8a2b6b); }
+.dot.l { background: var(--left); }
+.dot.r { background: var(--right); }
+.dot.ro { background: transparent; border: 2px solid var(--text); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font-family: var(--mono); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+.flybox { position: relative; }
+#fly { width: 100%; max-width: 100%; display: block; }
+.bubble {
+  position: absolute; top: 2%; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: var(--ink);
+  font: 800 clamp(18px, 3vw, 26px)/1 var(--display);
+  padding: 10px 18px; border-radius: 999px; white-space: nowrap;
+  box-shadow: 0 6px 0 rgba(0,0,0,.35);
+}
+.bubble::after {
+  content: ""; position: absolute; left: 50%; bottom: -12px; width: 14px; height: 14px;
+  background: var(--text); border-radius: 50%; transform: translateX(-50%);
+}
+.bubble.verdict { background: var(--amber); }
+.bubble.verdict::after { background: var(--amber); }
+#flyRig { transition: transform .45s cubic-bezier(.3,1.6,.5,1); transform-origin: 200px 190px; }
+.wingL, .wingR { transform-box: fill-box; }
+.thinking .wingL { transform-origin: 100% 100%; animation: buzzL .06s infinite alternate; }
+.thinking .wingR { transform-origin: 0% 100%; animation: buzzR .06s infinite alternate; }
+@keyframes buzzL { from { transform: rotate(-4deg); } to { transform: rotate(9deg); } }
+@keyframes buzzR { from { transform: rotate(4deg); } to { transform: rotate(-9deg); } }
+.thinking .legF1 { animation: rub 0.35s infinite alternate ease-in-out; transform-box: fill-box; transform-origin: 50% 0; }
+.thinking .legF2 { animation: rub 0.35s infinite alternate-reverse ease-in-out; transform-box: fill-box; transform-origin: 50% 0; }
+@keyframes rub { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
+.pupil { transition: transform .3s ease; }
+
+.race { display: grid; gap: 10px; }
+.meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+.meter .who { font-size: 13px; min-width: 0; }
+.meter .who b { font-family: var(--mono); }
+.meter .count { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.bar { grid-column: 1 / -1; height: 10px; border-radius: 99px; background: var(--ink); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: 99px; }
+.meter.l .bar i { background: var(--left); }
+.meter.r .bar i { background: var(--right); }
+.meter.l .who { color: var(--left); }
+.meter.r .who { color: var(--right); }
+.caption { margin: 0; font: 500 18px/1.35 var(--display); min-height: 2.7em; }
+
+.netwrap { overflow-x: auto; }
+#net { display: block; min-width: 560px; width: 100%; }
+#net text { font-family: var(--mono); }
+.chip { transition: transform .5s cubic-bezier(.4,1.4,.5,1); }
+
+#log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 260px; overflow-y: auto; }
+#log li { display: grid; grid-template-columns: 3ch minmax(0, 1fr) auto; gap: 12px; padding: 6px 8px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+#log li.now { background: var(--ink); color: var(--text); }
+#log li .n { font-family: var(--mono); }
+#log li .ok { color: var(--good); font-weight: 700; }
+#log li .no { color: var(--bad); font-weight: 700; }
+#log li.pending { opacity: .45; }
+
+footer { color: var(--muted); font-size: 12px; max-width: 90ch; }
+footer a { color: var(--text); }
+@media (prefers-reduced-motion: reduce) {
+  .thinking .wingL, .thinking .wingR, .thinking .legF1, .thinking .legF2 { animation: none; }
+  #flyRig, .chip, .pupil { transition: none; }
+}
+</style>
+<!--BODY-->
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Fly Brain Sort<span class="buzz">*</span></h1>
+      <p class="sub" id="sub">A simulated fruit fly brain decides every comparison in this sort.</p>
+    </div>
+    <div class="controls">
+      <button class="primary" id="play" type="button">Play</button>
+      <button id="step" type="button">Next comparison</button>
+      <button id="restart" type="button">Restart</button>
+      <select id="speed" aria-label="Playback speed">
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+      <label class="file">Load replay<input id="file" type="file" accept=".json,application/json"></label>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="panel">
+      <div class="panel-head"><h2>Whole brain, front view</h2><span class="mono" id="clock">t = 0.0 ms</span></div>
+      <canvas id="brain" aria-label="Neurons of the fly brain lighting up as they spike"></canvas>
+      <div class="legend">
+        <span><i class="dot heat"></i>spiking neuron</span>
+        <span><i class="dot l"></i>fly's left eye bristle neurons</span>
+        <span><i class="dot r"></i>fly's right eye bristle neurons</span>
+        <span><i class="dot ro"></i>readout neurons</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="sSpk">0</b><small>central spikes</small></div>
+        <div class="stat"><b id="sNeu">0</b><small>neurons fired</small></div>
+        <div class="stat"><b id="sFly">0.0 s</b><small>fly time so far</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>The fly</h2><span class="mono" id="roundLabel">comparison 1</span></div>
+      <div class="flybox" id="flybox">
+        <svg id="fly" viewBox="0 0 400 330" role="img" aria-label="Cartoon fly thinking">
+          <defs>
+            <pattern id="facets" width="9" height="8" patternUnits="userSpaceOnUse">
+              <circle cx="4.5" cy="4" r="3.3" fill="var(--eye)" stroke="var(--eye-deep)" stroke-width="1"></circle>
+            </pattern>
+            <radialGradient id="shine" cx="35%" cy="30%" r="60%">
+              <stop offset="0" stop-color="#ffffff" stop-opacity=".35"></stop>
+              <stop offset="1" stop-color="#ffffff" stop-opacity="0"></stop>
+            </radialGradient>
+          </defs>
+          <g id="flyRig">
+            <g class="wingL"><ellipse cx="92" cy="200" rx="88" ry="34" fill="var(--wing)" fill-opacity=".22" stroke="var(--wing)" stroke-opacity=".5" transform="rotate(-18 92 200)"></ellipse></g>
+            <g class="wingR"><ellipse cx="308" cy="200" rx="88" ry="34" fill="var(--wing)" fill-opacity=".22" stroke="var(--wing)" stroke-opacity=".5" transform="rotate(18 308 200)"></ellipse></g>
+            <ellipse cx="200" cy="262" rx="62" ry="48" fill="var(--chitin-deep)"></ellipse>
+            <g stroke="var(--chitin-deep)" stroke-width="6" stroke-linecap="round" fill="none">
+              <path class="legF1" d="M180 280 q-14 22 -6 44"></path>
+              <path class="legF2" d="M220 280 q14 22 6 44"></path>
+              <path d="M150 268 q-40 14 -58 44"></path>
+              <path d="M250 268 q40 14 58 44"></path>
+            </g>
+            <ellipse cx="200" cy="182" rx="74" ry="62" fill="var(--chitin)"></ellipse>
+            <g id="eyeRight">
+              <ellipse cx="128" cy="170" rx="64" ry="76" fill="url(#facets)" stroke="var(--eye-deep)" stroke-width="3"></ellipse>
+              <ellipse cx="128" cy="170" rx="64" ry="76" fill="url(#shine)"></ellipse>
+              <g class="bristles" id="bristlesR"></g>
+              <circle cx="128" cy="166" r="27" fill="#fff"></circle>
+              <circle class="pupil" cx="128" cy="168" r="12" fill="#111"></circle>
+            </g>
+            <g id="eyeLeft">
+              <ellipse cx="272" cy="170" rx="64" ry="76" fill="url(#facets)" stroke="var(--eye-deep)" stroke-width="3"></ellipse>
+              <ellipse cx="272" cy="170" rx="64" ry="76" fill="url(#shine)"></ellipse>
+              <g class="bristles" id="bristlesL"></g>
+              <circle cx="272" cy="166" r="27" fill="#fff"></circle>
+              <circle class="pupil" cx="272" cy="168" r="12" fill="#111"></circle>
+            </g>
+            <g stroke="var(--chitin-deep)" stroke-width="5" stroke-linecap="round" fill="none">
+              <path d="M190 130 q-6 -18 -22 -26"></path>
+              <path d="M210 130 q6 -18 22 -26"></path>
+            </g>
+            <g stroke="var(--muted)" stroke-width="1.5" fill="none">
+              <path d="M168 104 q-18 -6 -30 -26"></path>
+              <path d="M232 104 q18 -6 30 -26"></path>
+            </g>
+            <path id="proboscis" d="M192 236 q8 30 16 0" fill="var(--chitin-deep)"></path>
+          </g>
+        </svg>
+        <div class="bubble" id="bubble">Hmm?</div>
+      </div>
+      <div class="race">
+        <div class="meter r">
+          <span class="who">fly's right eye sees <b id="rVal">?</b> · <span class="mono" id="rRate">0 Hz</span> → AN_GNG_89 (right)</span>
+          <span class="count" id="rCount">0</span>
+          <div class="bar"><i id="rBar"></i></div>
+        </div>
+        <div class="meter l">
+          <span class="who">fly's left eye sees <b id="lVal">?</b> · <span class="mono" id="lRate">0 Hz</span> → AN_GNG_89 (left)</span>
+          <span class="count" id="lCount">0</span>
+          <div class="bar"><i id="lBar"></i></div>
+        </div>
+      </div>
+      <p class="caption" id="caption">Press play. The fly is ready. Probably.</p>
+    </section>
+  </main>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Sorting network</h2><span class="mono" id="netLabel"></span></div>
+    <div class="netwrap"><svg id="net" role="img" aria-label="Batcher sorting network with the items on its wires"></svg></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>What the fly decided</h2><span class="mono" id="score"></span></div>
+    <ol id="log"></ol>
+  </section>
+
+  <footer id="credits">
+    Brain: FlyWire connectome v783 (Dorkenwald et al. 2024), cell types from Schlegel et al. 2024,
+    leaky integrate-and-fire model after Shiu et al. 2024. Neuron positions are real FlyWire coordinates.
+    Fly cartoon is not to scale and has never seen a pupil.
+  </footer>
+</div>
+
+<script id="replay" type="application/json">__REPLAY__</script>
+<script>
+(() => {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fmt = (v) => (typeof v === "number" && !Number.isInteger(v) ? +v.toFixed(3) : v);
+const pick = (list, k) => list[((k % list.length) + list.length) % list.length];
+
+const THINK = [
+  "Consulting all 138,639 neurons. They have opinions.",
+  "Rubbing front legs together thoughtfully.",
+  "Eye bristles tingling. Something is bigger than something.",
+  "Routing this through the gnathal ganglion, as one does.",
+  "This is harder than finding a banana.",
+  "Buzzing intensifies.",
+  "Counting spikes. Losing count. Counting again.",
+  "Thinking with its whole brain. All 0.1 mm³ of it.",
+  "Asking the left side. Asking the right side. Comparing notes.",
+  "Pretending this is about fruit.",
+];
+const VERDICT = [
+  (a, b) => `${a} is bigger. Obviously.`,
+  (a, b) => `${a}. Final answer.`,
+  (a, b) => `My bristles say ${a}.`,
+  (a, b) => `${a} wins. Don't tell ${b}.`,
+  (a, b) => `Trust the ganglion: ${a}.`,
+  (a, b) => `${a}! Next question, please.`,
+  (a, b) => `${b}? Please. It's ${a}.`,
+];
+
+let R = null;
+let gates = [];        // flat list of {round, comp}
+let pts = null;        // canvas positions of animated neurons
+let bgPts = null;
+let roles = null;
+let heat = null;       // glow per animated neuron
+let fired = null;      // has neuron fired at all
+let sens = { left: [], right: [], phase: null, lastCount: null };
+let roIdx = { left: -1, right: -1 };
+let mirror = false;
+let view = { w: 0, h: 0, dpr: 1, ox: 0, oy: 0, s: 1 };
+let bgCanvas = null;
+
+const state = {
+  g: 0, phase: "idle", t: 0, verdictT: 0, playing: false, speed: 1,
+  wires: [], frameDone: 0, spikes: 0, neurons: 0, flyMs: 0,
+};
+
+function parseEmbedded() {
+  try {
+    const txt = $("replay").textContent.trim();
+    return txt.startsWith("{") ? JSON.parse(txt) : null;
+  } catch (e) { return null; }
+}
+
+function load(replay) {
+  R = replay;
+  gates = [];
+  R.rounds.forEach((rd, r) => rd.comparisons.forEach((c) => gates.push({ round: r, comp: c, frames: rd.frames })));
+  roles = R.roles;
+  const n = roles.length;
+  heat = new Float32Array(n);
+  fired = new Uint8Array(n);
+  sens.left = []; sens.right = [];
+  roIdx = { left: -1, right: -1 };
+  let mxL = 0, mxR = 0;
+  for (let k = 0; k < n; k++) {
+    const x = R.shown[2 * k];
+    if (roles[k] === 1) { sens.left.push(k); mxL += x; }
+    if (roles[k] === 2) { sens.right.push(k); mxR += x; }
+    if (roles[k] === 3) roIdx.left = k;
+    if (roles[k] === 4) roIdx.right = k;
+  }
+  // show the fly's left on the viewer's right, as if facing the fly
+  mirror = sens.left.length && sens.right.length && mxL / sens.left.length < mxR / sens.right.length;
+  sens.phase = new Float32Array(n).map(() => Math.random());
+  sens.lastCount = new Int32Array(n);
+
+  const c = R.comparator;
+  $("sub").innerHTML =
+    `<strong>${R.brain.neurons.toLocaleString()}</strong> simulated neurons and ` +
+    `<strong>${R.brain.connections.toLocaleString()}</strong> connections decide every comparison. ` +
+    `The fly feels the numbers through ${c.sensory_per_side[0] + c.sensory_per_side[1]} bristle neurons on its eyes ` +
+    `(<span class="mono">${c.sensory}</span>) and answers with one <span class="mono">${c.readout}</span> neuron per hemisphere.`;
+  buildBristles();
+  layoutCanvas();
+  drawNetwork(true);
+  buildLog();
+  reset();
+}
+
+function reset() {
+  state.g = 0; state.phase = "idle"; state.t = 0; state.verdictT = 0;
+  state.wires = R.values.map((_, i) => i);
+  state.spikes = 0; state.neurons = 0; state.flyMs = 0;
+  heat.fill(0); fired.fill(0); sens.lastCount.fill(0);
+  setPlaying(false);
+  $("flybox").classList.remove("thinking");
+  tilt(0);
+  bubble("Hmm?", false);
+  $("caption").textContent = `${R.values.length} numbers, ${gates.length} comparisons. Press play. The fly is ready. Probably.`;
+  showGate(0, false);
+  drawNetwork(false);
+  updateLog();
+  updateStats();
+}
+
+/* ---------- fly ---------- */
+function buildBristles() {
+  const ns = "http://www.w3.org/2000/svg";
+  for (const [id, cx] of [["bristlesR", 128], ["bristlesL", 272]]) {
+    const g = $(id);
+    g.innerHTML = "";
+    for (let k = 0; k < 34; k++) {
+      const a = (k * 2.399963) % (2 * Math.PI);
+      const r = 22 + ((k * 37) % 41);
+      const x = cx + Math.cos(a) * r * 0.86, y = 170 + Math.sin(a) * r;
+      const l = document.createElementNS(ns, "line");
+      l.setAttribute("x1", x); l.setAttribute("y1", y);
+      l.setAttribute("x2", x + Math.cos(a) * 9); l.setAttribute("y2", y + Math.sin(a) * 9);
+      l.setAttribute("stroke-width", "2"); l.setAttribute("stroke-linecap", "round");
+      g.appendChild(l);
+    }
+  }
+}
+function bristleGlow(side, amount) {
+  const g = side === "left" ? $("bristlesL") : $("bristlesR");
+  g.setAttribute("stroke", side === "left" ? css("--left") : css("--right"));
+  g.setAttribute("stroke-opacity", (0.15 + 0.85 * amount).toFixed(2));
+}
+function tilt(dir) {
+  $("flyRig").style.transform = `rotate(${dir * 9}deg)`;
+  // viewer's right is the fly's left
+  for (const p of document.querySelectorAll(".pupil")) p.style.transform = `translate(${dir * 9}px, ${dir ? -3 : 0}px)`;
+}
+function bubble(text, verdict) {
+  const b = $("bubble");
+  b.textContent = text;
+  b.classList.toggle("verdict", verdict);
+}
+
+/* ---------- comparison bookkeeping ---------- */
+function sides(c) {
+  const [i0, i1] = c.items, [r0, r1] = c.rates;
+  return c.flipped
+    ? { left: { item: i1, rate: r1 }, right: { item: i0, rate: r0 } }
+    : { left: { item: i0, rate: r0 }, right: { item: i1, rate: r1 } };
+}
+function judged(c) {
+  const tie = c.spikes[0] === c.spikes[1];
+  const big = c.swapped ? c.items[0] : c.items[1];
+  const small = big === c.items[0] ? c.items[1] : c.items[0];
+  const right = R.values[big] >= R.values[small];
+  return { big, small, tie, right };
+}
+function showGate(g, live) {
+  if (g >= gates.length) return;
+  const c = gates[g].comp, s = sides(c);
+  $("roundLabel").textContent = `comparison ${g + 1} of ${gates.length}`;
+  $("lVal").textContent = fmt(R.values[s.left.item]);
+  $("rVal").textContent = fmt(R.values[s.right.item]);
+  $("lRate").textContent = `${s.left.rate.toFixed(0)} Hz`;
+  $("rRate").textContent = `${s.right.rate.toFixed(0)} Hz`;
+  meters(0, 0);
+  const span = R.rate_range[1] - R.rate_range[0];
+  bristleGlow("left", live ? (s.left.rate - R.rate_range[0]) / span : 0);
+  bristleGlow("right", live ? (s.right.rate - R.rate_range[0]) / span : 0);
+}
+function meters(nl, nr) {
+  const max = 64;
+  $("lCount").textContent = nl; $("rCount").textContent = nr;
+  $("lBar").style.width = `${Math.min(100, (100 * nl) / max)}%`;
+  $("rBar").style.width = `${Math.min(100, (100 * nr) / max)}%`;
+}
+
+/* ---------- brain canvas ---------- */
+function layoutCanvas() {
+  const cv = $("brain");
+  const rect = cv.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  view.w = Math.max(200, rect.width); view.h = Math.max(100, rect.height); view.dpr = dpr;
+  cv.width = Math.round(view.w * dpr); cv.height = Math.round(view.h * dpr);
+  let ymax = 0;
+  for (let k = 1; k < R.background.length; k += 2) ymax = Math.max(ymax, R.background[k]);
+  for (let k = 1; k < R.shown.length; k += 2) ymax = Math.max(ymax, R.shown[k]);
+  const pad = 12;
+  view.s = Math.min((view.w - 2 * pad) / 1000, (view.h - 2 * pad) / ymax);
+  view.ox = (view.w - 1000 * view.s) / 2; view.oy = (view.h - ymax * view.s) / 2;
+  const P = (arr) => {
+    const out = new Float32Array(arr.length);
+    for (let k = 0; k < arr.length; k += 2) {
+      const x = mirror ? 1000 - arr[k] : arr[k];
+      out[k] = view.ox + x * view.s; out[k + 1] = view.oy + arr[k + 1] * view.s;
+    }
+    return out;
+  };
+  pts = P(R.shown); bgPts = P(R.background);
+  bgCanvas = document.createElement("canvas");
+  bgCanvas.width = cv.width; bgCanvas.height = cv.height;
+  const b = bgCanvas.getContext("2d");
+  b.scale(dpr, dpr);
+  b.fillStyle = css("--ink"); b.fillRect(0, 0, view.w, view.h);
+  b.fillStyle = "rgba(143,149,171,0.22)";
+  for (let k = 0; k < bgPts.length; k += 2) b.fillRect(bgPts[k], bgPts[k + 1], 1.1, 1.1);
+  b.fillStyle = "rgba(143,149,171,0.35)";
+  for (let k = 0; k < pts.length; k += 2) b.fillRect(pts[k], pts[k + 1], 1.2, 1.2);
+  b.font = `600 11px ${css("--mono")}`;
+  b.fillStyle = css("--muted");
+  b.textAlign = "left"; b.fillText("fly's right", 10, view.h - 10);
+  b.textAlign = "right"; b.fillText("fly's left", view.w - 10, view.h - 10);
+  drawBrain();
+}
+function heatColor(v) {
+  // dark purple -> magenta -> amber -> pale yellow, the usual spike heat map
+  const stops = [[60, 20, 90], [170, 40, 110], [255, 140, 50], [255, 200, 80], [255, 250, 210]];
+  const x = Math.min(0.999, Math.max(0, v)) * (stops.length - 1);
+  const i = Math.floor(x), f = x - i, a = stops[i], b = stops[i + 1];
+  return `rgb(${a[0] + (b[0] - a[0]) * f | 0},${a[1] + (b[1] - a[1]) * f | 0},${a[2] + (b[2] - a[2]) * f | 0})`;
+}
+function drawBrain() {
+  const cv = $("brain"), ctx = cv.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(bgCanvas, 0, 0);
+  ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  ctx.globalCompositeOperation = "lighter";
+  const left = css("--left"), right = css("--right");
+  for (let k = 0; k < heat.length; k++) {
+    const v = heat[k];
+    if (v < 0.03) continue;
+    const role = roles[k];
+    if (role === 3 || role === 4) continue;
+    ctx.globalAlpha = role ? Math.min(0.5, v * 0.6) : Math.min(1, v * 1.2);
+    ctx.fillStyle = role === 1 ? left : role === 2 ? right : heatColor(v);
+    const r = role ? 1.2 + v * 1.6 : 1.3 + v * 2.8;
+    ctx.beginPath(); ctx.arc(pts[2 * k], pts[2 * k + 1], r, 0, 6.2832); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  for (const [side, col] of [["left", left], ["right", right]]) {
+    const k = roIdx[side];
+    if (k < 0) continue;
+    const x = pts[2 * k], y = pts[2 * k + 1], v = heat[k];
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 5 + v * 9, 0, 6.2832); ctx.stroke();
+    if (v > 0.05) { ctx.globalAlpha = v; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 3, 0, 6.2832); ctx.fill(); ctx.globalAlpha = 1; }
+  }
+  const kl = roIdx.left, kr = roIdx.right;
+  if (kl >= 0 && kr >= 0) {
+    const y = Math.min(pts[2 * kl + 1], pts[2 * kr + 1]) - 18;
+    ctx.font = `600 11px ${css("--mono")}`; ctx.textAlign = "center"; ctx.fillStyle = css("--text");
+    ctx.fillText("AN_GNG_89 ×2", (pts[2 * kl] + pts[2 * kr]) / 2, y);
+  }
+}
+
+/* ---------- sorting network ---------- */
+const NET = { rowH: 34, left: 84, right: 84, top: 18 };
+function drawNetwork(full) {
+  const svg = $("net"), n = R.values.length, cols = gates.length;
+  const colW = 30, W = NET.left + cols * colW + NET.right, H = NET.top * 2 + (n - 1) * NET.rowH + 14;
+  const y = (k) => NET.top + 7 + k * NET.rowH;
+  const x = (g) => NET.left + (g + 0.5) * colW;
+  if (full) {
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.style.minWidth = `${Math.min(W, 1100)}px`;
+    const ns = "http://www.w3.org/2000/svg";
+    let s = "";
+    for (let k = 0; k < n; k++) s += `<line x1="${NET.left - 6}" x2="${W - NET.right + 6}" y1="${y(k)}" y2="${y(k)}" stroke="${css("--line")}" stroke-width="2"/>`;
+    gates.forEach((gt, g) => {
+      const [i, j] = gt.comp.wires;
+      s += `<g class="gate" data-g="${g}"><line x1="${x(g)}" x2="${x(g)}" y1="${y(i)}" y2="${y(j)}" stroke-width="2.5"/>` +
+           `<circle cx="${x(g)}" cy="${y(i)}" r="4.5"/><circle cx="${x(g)}" cy="${y(j)}" r="4.5"/></g>`;
+    });
+    s += `<g id="chips"></g><g id="outChips"></g>`;
+    svg.innerHTML = s;
+    const chips = svg.querySelector("#chips");
+    R.values.forEach((v, item) => {
+      const g = document.createElementNS(ns, "g");
+      g.setAttribute("class", "chip"); g.dataset.item = item;
+      g.innerHTML = `<rect x="6" y="-13" width="${NET.left - 18}" height="26" rx="13" fill="${css("--ink")}" stroke="${css("--muted")}"/>` +
+                    `<text x="${6 + (NET.left - 18) / 2}" y="5" text-anchor="middle" font-size="13" fill="${css("--text")}">${fmt(v)}</text>`;
+      chips.appendChild(g);
+    });
+  }
+  // gate colours by progress
+  svg.querySelectorAll(".gate").forEach((el) => {
+    const g = +el.dataset.g;
+    const col = g < state.g ? css("--muted") : g === state.g && state.phase !== "idle" && state.phase !== "done" ? css("--amber") : css("--line");
+    el.setAttribute("stroke", col); el.setAttribute("fill", col);
+    el.setAttribute("opacity", g < state.g ? 0.55 : 1);
+  });
+  // chips sit on their current wire
+  state.wires.forEach((item, k) => {
+    const el = svg.querySelector(`.chip[data-item="${item}"]`);
+    if (el) el.style.transform = `translate(0px, ${y(k)}px)`;
+  });
+  const out = svg.querySelector("#outChips");
+  out.innerHTML = "";
+  if (state.phase === "done") {
+    state.wires.forEach((item, k) => {
+      out.insertAdjacentHTML("beforeend",
+        `<g transform="translate(${W - NET.right + 12}, ${y(k)})"><rect x="0" y="-13" width="${NET.right - 18}" height="26" rx="13" fill="${css("--amber")}"/>` +
+        `<text x="${(NET.right - 18) / 2}" y="5" text-anchor="middle" font-size="13" font-weight="600" fill="${css("--ink")}">${fmt(R.values[item])}</text></g>`);
+    });
+  }
+  $("netLabel").textContent = `${n} wires · ${gates.length} comparators · ${R.rounds.length} brain simulations`;
+}
+
+/* ---------- log ---------- */
+function buildLog() {
+  const ol = $("log");
+  ol.innerHTML = "";
+  gates.forEach((gt, g) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="n">${g + 1}</span><span class="what"></span><span class="res"></span>`;
+    ol.appendChild(li);
+  });
+}
+function updateLog() {
+  const items = $("log").children;
+  let right = 0, done = 0;
+  gates.forEach((gt, g) => {
+    const li = items[g], c = gt.comp, j = judged(c);
+    const decided = g < state.g || (g === state.g && state.phase === "verdict");
+    li.classList.toggle("pending", !decided && g !== state.g);
+    li.classList.toggle("now", g === state.g && state.phase !== "idle" && state.phase !== "done");
+    const a = fmt(R.values[c.items[0]]), b = fmt(R.values[c.items[1]]);
+    if (decided) {
+      done++; if (j.right) right++;
+      li.querySelector(".what").textContent =
+        `${a} vs ${b}: ${j.tie ? "dead heat, kept in place" : `${fmt(R.values[j.big])} is bigger`} (${c.spikes[0]} vs ${c.spikes[1]} spikes)`;
+      li.querySelector(".res").innerHTML = j.right ? `<span class="ok">right</span>` : `<span class="no">oops</span>`;
+    } else {
+      li.querySelector(".what").textContent = `${a} vs ${b}`;
+      li.querySelector(".res").textContent = "";
+    }
+  });
+  $("score").textContent = done ? `${right} of ${done} comparisons right` : "";
+  const now = items[state.g];
+  if (now && state.playing) now.scrollIntoView({ block: "nearest" });
+}
+function updateStats() {
+  $("sSpk").textContent = state.spikes.toLocaleString();
+  $("sNeu").textContent = state.neurons.toLocaleString();
+  $("sFly").textContent = `${(state.flyMs / 1000).toFixed(1)} s`;
+  $("clock").textContent = `t = ${state.t.toFixed(1)} ms of ${R.duration_ms} ms`;
+}
+
+/* ---------- playback ---------- */
+const THINK_MS = 3200, VERDICT_MS = 1500;
+function begin(g) {
+  state.g = g; state.phase = "think"; state.t = 0; state.frameDone = 0;
+  sens.lastCount.fill(0);
+  const c = gates[g].comp, s = sides(c);
+  $("flybox").classList.add("thinking");
+  tilt(0);
+  bubble(`${fmt(R.values[s.right.item])} or ${fmt(R.values[s.left.item])}?`, false);
+  $("caption").textContent = pick(THINK, g * 7 + 3);
+  showGate(g, true);
+  drawNetwork(false);
+  updateLog();
+}
+function verdict() {
+  const gt = gates[state.g], c = gt.comp, s = sides(c), j = judged(c);
+  state.phase = "verdict"; state.verdictT = 0;
+  state.t = R.duration_ms;
+  $("flybox").classList.remove("thinking");
+  const winSide = s.left.item === j.big ? "left" : "right";
+  if (j.tie) { tilt(0); bubble("¯\\_(ツ)_/¯", true); $("caption").textContent = "Dead heat. The fly shrugs and leaves them where they are."; }
+  else {
+    tilt(winSide === "left" ? 1 : -1);
+    const a = fmt(R.values[j.big]), b = fmt(R.values[j.small]);
+    bubble(`${a}!`, true);
+    $("caption").textContent = j.right ? pick(VERDICT, state.g)(a, b) : `${a}? The fly is confident. The fly is wrong. ${b} was bigger.`;
+  }
+  if (c.swapped) {
+    const [i, k] = c.wires;
+    [state.wires[i], state.wires[k]] = [state.wires[k], state.wires[i]];
+  }
+  meters(c.readout_times.left.length, c.readout_times.right.length);
+  state.flyMs += R.duration_ms;
+  drawNetwork(false);
+  updateLog();
+  updateStats();
+}
+function finish() {
+  state.phase = "done"; state.g = gates.length;
+  setPlaying(false);
+  $("flybox").classList.remove("thinking");
+  tilt(0);
+  const ok = R.correct;
+  bubble(ok ? "Sorted!" : "Mostly sorted!", true);
+  $("caption").textContent = ok
+    ? `${R.values.length} numbers sorted by a fruit fly brain in ${(state.flyMs / 1000).toFixed(1)} s of fly time. It would like a banana now.`
+    : "Mostly sorted. A couple of numbers were too close for the fly to tell apart. It blames its left eye.";
+  bristleGlow("left", 0); bristleGlow("right", 0);
+  drawNetwork(false);
+  updateLog();
+}
+function advanceBrain(t1) {
+  const gt = gates[state.g], frames = gt.frames, fm = R.frame_ms;
+  const upto = Math.min(frames.length, Math.floor(t1 / fm));
+  for (let f = state.frameDone; f < upto; f++) {
+    for (const k of frames[f]) {
+      heat[k] = 1;
+      state.spikes++;
+      if (!fired[k]) { fired[k] = 1; state.neurons++; }
+    }
+  }
+  state.frameDone = Math.max(state.frameDone, upto);
+  const s = sides(gt.comp);
+  for (const [list, rate] of [[sens.left, s.left.rate], [sens.right, s.right.rate]]) {
+    for (const k of list) {
+      const n = Math.floor((t1 * rate) / 1000 + sens.phase[k]);
+      if (n > sens.lastCount[k]) { heat[k] = 1; sens.lastCount[k] = n; }
+    }
+  }
+  const rt = gt.comp.readout_times;
+  const nl = rt.left.filter((t) => t <= t1).length, nr = rt.right.filter((t) => t <= t1).length;
+  if (roIdx.left >= 0 && rt.left.some((t) => t > state.t && t <= t1)) heat[roIdx.left] = 1;
+  if (roIdx.right >= 0 && rt.right.some((t) => t > state.t && t <= t1)) heat[roIdx.right] = 1;
+  meters(nl, nr);
+  state.t = t1;
+}
+function decay(dtBrain) {
+  const k = Math.exp(-dtBrain / 14);
+  for (let i = 0; i < heat.length; i++) heat[i] *= k;
+}
+
+let last = 0;
+function tick(now) {
+  const dt = last ? Math.min(100, now - last) : 16;
+  last = now;
+  if (R && state.playing) {
+    if (state.phase === "think") {
+      const dtBrain = (dt * state.speed * R.duration_ms) / THINK_MS;
+      const t1 = Math.min(R.duration_ms, state.t + dtBrain);
+      advanceBrain(t1);
+      decay(dtBrain);
+      updateStats();
+      if (t1 >= R.duration_ms) verdict();
+    } else if (state.phase === "verdict") {
+      state.verdictT += dt * state.speed;
+      decay(dt * 0.05);
+      if (state.verdictT >= VERDICT_MS) {
+        if (state.g + 1 < gates.length) begin(state.g + 1); else finish();
+      }
+    } else if (state.phase === "idle") {
+      begin(0);
+    }
+  } else if (R) {
+    decay(dt * 0.02);
+  }
+  if (R) drawBrain();
+  requestAnimationFrame(tick);
+}
+
+function setPlaying(on) {
+  state.playing = on;
+  $("play").textContent = on ? "Pause" : state.phase === "done" ? "Replay" : "Play";
+}
+$("play").addEventListener("click", () => {
+  if (!R) return;
+  if (state.phase === "done") reset();
+  setPlaying(!state.playing);
+});
+$("step").addEventListener("click", () => {
+  if (!R || state.phase === "done") return;
+  setPlaying(false);
+  if (state.phase === "idle") begin(0);
+  else if (state.phase === "verdict") { if (state.g + 1 < gates.length) begin(state.g + 1); else finish(); }
+  if (state.phase === "think") { advanceBrain(R.duration_ms); updateStats(); verdict(); }
+});
+$("restart").addEventListener("click", () => R && reset());
+$("speed").addEventListener("change", (e) => { state.speed = +e.target.value; });
+$("file").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try { load(JSON.parse(await f.text())); $("caption").textContent = `Loaded ${f.name}. Press play.`; }
+  catch (err) { $("caption").textContent = `Couldn't read ${f.name}: it is not a replay saved by flybrain_sort.gui.`; }
+});
+let resizeTimer = 0;
+addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => R && layoutCanvas(), 120); });
+
+const embedded = parseEmbedded();
+if (embedded) load(embedded);
+else $("caption").textContent = "No replay embedded. Load one saved with python -m flybrain_sort.gui --save-replay.";
+if (reduced) state.speed = 1;
+requestAnimationFrame(tick);
+})();
+</script>

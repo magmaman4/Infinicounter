@@ -39,6 +39,9 @@ def toy_brain(n_sensory=40, n_other=200, seed=0):
         "cell_class": None,
         "cell_type": ["toy_SN"] * (2 * n_sensory) + ["toy_RO", "toy_RO"] + [None] * n_other,
         "side": ["left"] * n_sensory + ["right"] * n_sensory + ["left", "right"] + ["center"] * n_other,
+        "pos_x": rng.uniform(0, 1e5, n),
+        "pos_y": rng.uniform(0, 5e4, n),
+        "pos_z": rng.uniform(0, 5e3, n),
     })
     return Connectome(w, neurons)
 

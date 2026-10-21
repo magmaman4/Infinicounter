@@ -101,6 +101,7 @@ spikes to count and sharpens discrimination.
 ```bash
 pip install -e .            # numpy, scipy, pandas, pyarrow
 python -m flybrain_sort 5 3 9 1 7
+python -m flybrain_sort.gui 5 3 9 1 7    # same, with the animated viewer
 ```
 
 ```python
@@ -120,13 +121,38 @@ Options: `--duration` (ms of brain time per round; longer means more
 evidence and finer discrimination), `--rates LO HI`, `--mode poisson`
 (Poisson instead of regular sensory spike trains), `--seed`.
 
+## Watch it think
+
+```bash
+python -m flybrain_sort.gui 42 7 19 3 88 61 25 50
+```
+
+This runs the sort while recording every spike in the brain, then writes
+`flybrain-sort.html` and opens it. The page replays the run:
+
+* **Whole brain, front view.** Every neuron that fired, plus a sample of
+  16,000 that stayed quiet, drawn at its real FlyWire position. Spikes glow
+  in a heat map, the eye-bristle neurons of each side flicker at the rates
+  that encode the two numbers, and the two `AN_GNG_89` readouts pulse.
+* **The fly.** A cartoon fly (not to scale, has pupils) buzzes and rubs its
+  legs while the brain runs, then leans toward the eye that saw the bigger
+  number. The readout spike counts race below it.
+* **Sorting network.** The items ride the Batcher network's wires and swap
+  when the fly says so.
+* **Decision log.** Every comparison, its spike counts, and whether the fly
+  got it right.
+
+`docs/index.html` is a prebuilt replay of the example above. It opens
+offline in any browser. Use `--save-replay run.json` to keep a recording, and
+`--replay run.json` or the page's **Load replay** button to watch one again.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-The tests use a small synthetic connectome, so they run in about a second
+The tests use a small synthetic connectome, so they run in about two seconds
 without downloading anything. They check the sorting network
 exhaustively with the 0-1 principle and run the full discover, screen and sort
 pipeline on a toy brain.
